@@ -23,6 +23,14 @@ def vertice_caminho(no):
   caminho.reverse()
   return caminho
 
+def custo_caminho(no):
+    custo_total = 0
+
+    while no.no_pai is not None:
+        custo_total += no.custo
+        no = no.no_pai
+    return custo_total
+
 class Problema:
     def iniciar(self):
         raise NotImplementedError
@@ -140,6 +148,7 @@ class Sokoban(Problema):
 
         return sucessores
 
+#Função Dijkstra
 def dijkstra(problema):
     raiz = problema.iniciar()
     fila = []
@@ -170,6 +179,57 @@ def dijkstra(problema):
                  ))
             )
     return None, None
+
+#Função Heurística
+def heuristica(problema, estado):
+    agente, caixas, carregando = estado
+    caixas = dict(caixas)
+    h = 0
+
+    for (x, y), peso in caixas.items():
+        menor = float("inf")
+
+        for ax, ay in problema.alvos:
+            dist = abs(x - ax) + abs(y - ay)
+
+            if dist < menor:
+                menor = dist
+        h += menor * peso
+    return h
+
+#Função Ganancioso
+def ganancioso(problema):
+    raiz = problema.iniciar()
+    fila = []
+    heapq.heappush(fila, (heuristica(problema, raiz.estado), raiz))
+    visitados = set()
+
+    while fila:
+        _, no = heapq.heappop(fila)
+
+        if problema.testar_objetivo(no):
+            return no
+
+        if no.estado in visitados:
+            continue
+
+        visitados.add(no.estado)
+
+        for sucessor in problema.gerar_sucessores(no):
+            h = heuristica(problema, sucessor.estado)
+            heapq.heappush(
+                fila,
+                (
+                    h,
+                    No(
+                        sucessor.estado,
+                        no,
+                        sucessor.aresta,
+                        sucessor.custo
+                    )
+                )
+            )
+    return None
 
 def gerar_grid_final(grid, estado):
     grid_final = copy.deepcopy(grid)
@@ -205,8 +265,10 @@ if __name__ == "__main__":
     arquivo = sys.argv[1]
     grid = ler_entrada(arquivo)
     problema = Sokoban(grid)
-    custo, no_solucao = dijkstra(problema)
 
+    print("Função Dijkstra")
+    # Dijkstra
+    custo, no_solucao = dijkstra(problema)
     if no_solucao is None:
         print("Sem solução")
         exit()
@@ -214,5 +276,19 @@ if __name__ == "__main__":
     movimentos = vertice_caminho(no_solucao)
     grid_final = gerar_grid_final(grid, no_solucao.estado)
     escrever_saida("dijkstra.txt", grid_final, movimentos)
-    print("Custo total:", custo)
-    print("Movimentos:", len(movimentos))
+    print("Custo total (Dijkstra):", custo)
+    print("Movimentos (Dijkstra):", len(movimentos))
+
+    print("\nFunção Ganancioso")
+    # Ganancioso
+    no_solucao_g = ganancioso(problema)
+
+    if no_solucao_g is None:
+        print("Ganancioso não encontrou solução")
+    else:
+        movimentos_g = vertice_caminho(no_solucao_g)
+        grid_final_g = gerar_grid_final(grid, no_solucao_g.estado)
+        escrever_saida("ganancioso.txt", grid_final_g, movimentos_g)
+        custo_g = custo_caminho(no_solucao_g)
+        print("Custo total (Ganancioso):", custo_g)
+        print("Movimentos (Ganancioso):", len(movimentos_g))

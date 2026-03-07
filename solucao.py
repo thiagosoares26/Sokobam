@@ -4,11 +4,12 @@ import heapq
 import copy
 
 class No:
-  def __init__(self, estado, no_pai=None, aresta=None, custo=0):
+  def __init__(self, estado, no_pai=None, aresta=None, custo=0, custo_total=0):
     self.estado = estado
     self.no_pai = no_pai
     self.aresta = aresta
     self.custo = custo
+    self.custo_total = custo_total
 
   def __lt__(self, other):
       return self.custo < other.custo
@@ -183,19 +184,27 @@ def dijkstra(problema):
 #Função Heurística
 def heuristica(problema, estado):
     agente, caixas, carregando = estado
+    objetivos = problema.alvos
     caixas = dict(caixas)
-    h = 0
+    soma = 0
 
-    for (x, y), peso in caixas.items():
+    for caixa in caixas:
         menor = float("inf")
+        for objetivo in objetivos:
+            dist = abs(caixa[0] - objetivo[0]) + abs(caixa[1] - objetivo[1])
+            menor = min(menor, dist)
 
-        for ax, ay in problema.alvos:
-            dist = abs(x - ax) + abs(y - ay)
+        soma += menor
 
-            if dist < menor:
-                menor = dist
-        h += menor * peso
-    return h
+    if carregando is not None:
+        menor = float("inf")
+        for objetivo in objetivos:
+            dist = abs(agente[0] - objetivo[0]) + abs(agente[1] - objetivo[1])
+            menor = min(menor, dist)
+
+        soma += menor
+
+    return soma
 
 #Função Ganancioso
 def ganancioso(problema):
@@ -230,6 +239,41 @@ def ganancioso(problema):
                 )
             )
     return None
+
+#Função A*
+def a_estrela(problema):
+
+    no_inicial = problema.iniciar()
+    no_inicial.custo_total = 0
+
+    fronteira = []
+    prioridade = heuristica(problema, no_inicial.estado)
+
+    heapq.heappush(fronteira, (prioridade, id(no_inicial), no_inicial))
+
+    explorados = set()
+
+    while fronteira:
+
+        _, _, no_atual = heapq.heappop(fronteira)
+
+        if problema.testar_objetivo(no_atual):
+            return no_atual.custo_total, no_atual
+
+        explorados.add(no_atual.estado)
+
+        for sucessor in problema.gerar_sucessores(no_atual):
+
+            if sucessor.estado in explorados:
+                continue
+
+            sucessor.custo_total = no_atual.custo_total + sucessor.custo
+
+            f = sucessor.custo_total + heuristica(problema, sucessor.estado)
+
+            heapq.heappush(fronteira, (f, id(sucessor), sucessor))
+
+    return None, None
 
 def gerar_grid_final(grid, estado):
     grid_final = copy.deepcopy(grid)
@@ -292,3 +336,15 @@ if __name__ == "__main__":
         custo_g = custo_caminho(no_solucao_g)
         print("Custo total (Ganancioso):", custo_g)
         print("Movimentos (Ganancioso):", len(movimentos_g))
+
+    print("\nFunção A*")
+    # A*
+    custo_a, no_solucao_a = a_estrela(problema)
+    if no_solucao_a is None:
+        print("A* não encontrou solução")
+    else:
+        movimentos_a = vertice_caminho(no_solucao_a)
+        grid_final_a = gerar_grid_final(grid, no_solucao_a.estado)
+        escrever_saida("a_estrela.txt", grid_final_a, movimentos_a)
+        print("Custo total:", custo_a)
+        print("Movimentos:", len(movimentos_a))
